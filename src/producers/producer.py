@@ -11,9 +11,12 @@ from kafka import KafkaProducer
 from models import Ride, ride_from_row
 
 # Download NYC yellow taxi trip data (first 1000 rows)
-url = "https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-11.parquet"
-columns = ['PULocationID', 'DOLocationID', 'trip_distance', 'total_amount', 'tpep_pickup_datetime']
-df = pd.read_parquet(url, columns=columns).head(1000)
+url = "https://d37ci6vzurychx.cloudfront.net/trip-data/green_tripdata_2025-10.parquet"
+columns = ['PULocationID', 'DOLocationID', 'trip_distance', 'total_amount', 'lpep_pickup_datetime', 'lpep_dropoff_datetime']
+df = pd.read_parquet(url, columns=columns)
+
+def json_serializer(data):
+    return json.dumps(data).encode('utf-8')
 
 def ride_serializer(ride):
     ride_dict = dataclasses.asdict(ride)
@@ -24,15 +27,17 @@ server = 'localhost:9092'
 
 producer = KafkaProducer(
     bootstrap_servers=[server],
-    value_serializer=ride_serializer
+    # value_serializer=ride_serializer
+    value_serializer=json_serializer
 )
 t0 = time.time()
 
-topic_name = 'rides'
+topic_name = 'green-trips'
 
 for _, row in df.iterrows():
     ride = ride_from_row(row)
-    producer.send(topic_name, value=ride)
+    # producer.send(topic_name, value=ride)
+    producer.send(topic_name, value=dataclasses.asdict(ride))
     print(f"Sent: {ride}")
     time.sleep(0.01)
 

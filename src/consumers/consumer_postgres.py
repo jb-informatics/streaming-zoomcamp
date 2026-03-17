@@ -9,7 +9,7 @@ from kafka import KafkaConsumer
 from models import ride_deserializer
 
 server = 'localhost:9092'
-topic_name = 'rides'
+topic_name = 'green-trips'
 
 # Connect to PostgreSQL
 conn = psycopg2.connect(
@@ -21,6 +21,16 @@ conn = psycopg2.connect(
 )
 conn.autocommit = True
 cur = conn.cursor()
+
+cur.execute("""
+CREATE TABLE IF NOT EXISTS processed_events (
+    PULocationID INTEGER,
+    DOLocationID INTEGER,
+    trip_distance FLOAT,
+    total_amount FLOAT,
+    pickup_datetime TIMESTAMP
+)
+""")
 
 consumer = KafkaConsumer(
     topic_name,
@@ -35,7 +45,7 @@ print(f"Listening to {topic_name} and writing to PostgreSQL...")
 count = 0
 for message in consumer:
     ride = message.value
-    pickup_dt = datetime.fromtimestamp(ride.tpep_pickup_datetime / 1000)
+    pickup_dt = datetime.fromtimestamp(ride.lpep_pickup_datetime / 1000)
     cur.execute(
         """INSERT INTO processed_events
            (PULocationID, DOLocationID, trip_distance, total_amount, pickup_datetime)
@@ -44,8 +54,9 @@ for message in consumer:
          ride.trip_distance, ride.total_amount, pickup_dt)
     )
     count += 1
+    print(f"Inserted Row {count}")
     if count % 100 == 0:
-        print(f"Inserted {count} rows...")
+        print(f"...Inserted {count} rows...")
 
 consumer.close()
 cur.close()
